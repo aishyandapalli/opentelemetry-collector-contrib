@@ -23,6 +23,7 @@ import (
 	"mime"
 	"net/http"
 	"sync"
+	"time"
 
 	apacheThrift "github.com/apache/thrift/lib/go/thrift"
 	"github.com/gorilla/mux"
@@ -176,6 +177,18 @@ func consumeTraces(ctx context.Context, batch *jaeger.Batch, consumer consumer.T
 	td, err := jaegertranslator.ThriftToTraces(batch)
 	if err != nil {
 		return 0, err
+	}
+
+	rs := td.ResourceSpans()
+	for i := 0; i < rs.Len(); i++ {
+		scopes := rs.At(i).ScopeSpans()
+		for j := 0; j < scopes.Len(); j++ {
+			spans := scopes.At(j).Spans()
+			for k := 0; k < spans.Len(); k++ {
+				span := spans.At(k)
+				span.Attributes().PutStr("trace_collector_received_time", time.Now().String())
+			}
+		}
 	}
 	return len(batch.Spans), consumer.ConsumeTraces(ctx, td)
 }
