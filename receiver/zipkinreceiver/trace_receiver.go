@@ -238,6 +238,18 @@ func (zr *zipkinReceiver) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		td, err = zr.v2ToTraceSpans(slurp, r.Header)
 	}
 
+	rs := td.ResourceSpans()
+	for i := 0; i < rs.Len(); i++ {
+		scopes := rs.At(i).ScopeSpans()
+		for j := 0; j < scopes.Len(); j++ {
+			spans := scopes.At(j).Spans()
+			for k := 0; k < spans.Len(); k++ {
+				span := spans.At(k)
+				span.Attributes().PutStr("trace_collector_received_time", time.Now().String())
+			}
+		}
+	}
+	
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
