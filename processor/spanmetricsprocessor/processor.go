@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"log"
 	"sort"
 	"strings"
 	"sync"
@@ -293,7 +294,18 @@ func (p *processorImp) buildMetrics() (pmetric.Metrics, error) {
 		p.resetAccumulatedMetrics()
 	}
 	p.resetExemplarData()
-
+	for i := 0; i < m.ResourceMetrics().Len(); i++ {
+		rs := m.ResourceMetrics().At(i)
+		for j := 0; j < rs.ScopeMetrics().Len(); j++ {
+			sm := rs.ScopeMetrics().At(j)
+			for k := 0; k < sm.Metrics().Len(); k++ {
+				m := sm.Metrics().At(k)
+				if strings.Contains(m.Name(), "latency") {
+					log.Println(m.Name())
+				}
+			}
+		}
+	}
 	return m, nil
 }
 
