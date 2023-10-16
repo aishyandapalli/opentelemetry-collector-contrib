@@ -29,6 +29,11 @@ type Dimension struct {
 	Default *string `mapstructure:"default"`
 }
 
+type Event struct {
+	Enabled    bool        `mapstructure:"enabled"`
+	Dimensions []Dimension `mapstructure:"dimensions"`
+}
+
 // Config defines the configuration options for spanmetricsconnector.
 type Config struct {
 	// Dimensions defines the list of additional dimensions on top of the provided:
@@ -58,6 +63,8 @@ type Config struct {
 
 	// Exemplars defines the configuration for exemplars.
 	Exemplars ExemplarsConfig `mapstructure:"exemplars"`
+
+	Events Event `mapstructure:"events"`
 }
 
 type HistogramConfig struct {

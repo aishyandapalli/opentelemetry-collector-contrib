@@ -36,6 +36,7 @@ const (
 
 	metricNameDuration = "duration"
 	metricNameCalls    = "calls"
+	metricNameEvents   = "events"
 
 	defaultUnit = metrics.Milliseconds
 )
@@ -66,11 +67,15 @@ type connectorImp struct {
 	started bool
 
 	shutdownOnce sync.Once
+
+	events      Event
+	eDimensions []dimension
 }
 
 type resourceMetrics struct {
 	histograms metrics.HistogramMetrics
 	sums       metrics.SumMetrics
+	events     metrics.SumMetrics
 	attributes pcommon.Map
 }
 
@@ -113,6 +118,8 @@ func newConnector(logger *zap.Logger, config component.Config, ticker *clock.Tic
 		metricKeyToDimensions: metricKeyToDimensionsCache,
 		ticker:                ticker,
 		done:                  make(chan struct{}),
+		events:                cfg.Events,
+		eDimensions:           newDimensions(cfg.Events.Dimensions),
 	}, nil
 }
 
@@ -245,6 +252,13 @@ func (p *connectorImp) buildMetrics() pmetric.Metrics {
 			metric.SetUnit(p.config.Histogram.Unit.String())
 			histograms.BuildMetrics(metric, p.startTimestamp, p.config.GetAggregationTemporality())
 		}
+
+		events := rawMetrics.events
+		if p.events.Enabled {
+			metric = sm.Metrics().AppendEmpty()
+			metric.SetName(buildMetricName(p.config.Namespace, metricNameEvents))
+			events.BuildMetrics(metric, p.startTimestamp, p.config.GetAggregationTemporality())
+		}
 	}
 
 	return m
@@ -288,6 +302,7 @@ func (p *connectorImp) aggregateMetrics(traces ptrace.Traces) {
 		rm := p.getOrCreateResourceMetrics(resourceAttr)
 		sums := rm.sums
 		histograms := rm.histograms
+		events := rm.events
 
 		unitDivider := unitDivider(p.config.Histogram.Unit)
 		serviceName := serviceAttr.Str()
@@ -305,10 +320,9 @@ func (p *connectorImp) aggregateMetrics(traces ptrace.Traces) {
 					duration = float64(endTime-startTime) / float64(unitDivider)
 				}
 				key := p.buildKey(serviceName, span, p.dimensions, resourceAttr)
-
 				attributes, ok := p.metricKeyToDimensions.Get(key)
 				if !ok {
-					attributes = p.buildAttributes(serviceName, span, resourceAttr)
+					attributes = p.buildAttributes(serviceName, span, resourceAttr, p.dimensions)
 					p.metricKeyToDimensions.Add(key, attributes)
 				}
 				if !p.config.Histogram.Disable {
@@ -321,6 +335,22 @@ func (p *connectorImp) aggregateMetrics(traces ptrace.Traces) {
 				// aggregate sums metrics
 				s := sums.GetOrCreate(key, attributes)
 				s.Add(1)
+
+				//events metrics
+				if p.events.Enabled {
+					for l := 0; l < span.Events().Len(); l++ {
+						event := span.Events().At(l)
+						eventAttrs := event.Attributes()
+						eKey := p.buildKey(serviceName, span, p.eDimensions, eventAttrs)
+						eAttributes, ok := p.metricKeyToDimensions.Get(eKey)
+						if !ok {
+							eAttributes = p.buildAttributes(serviceName, span, eventAttrs, p.eDimensions)
+							p.metricKeyToDimensions.Add(eKey, eAttributes)
+						}
+						e := events.GetOrCreate(eKey, eAttributes)
+						e.Add(1)
+					}
+				}
 			}
 		}
 	}
@@ -346,6 +376,7 @@ func (p *connectorImp) getOrCreateResourceMetrics(attr pcommon.Map) *resourceMet
 		v = &resourceMetrics{
 			histograms: initHistogramMetrics(p.config),
 			sums:       metrics.NewSumMetrics(),
+			events:     metrics.NewSumMetrics(),
 			attributes: attr,
 		}
 		p.resourceMetrics[key] = v
@@ -363,9 +394,9 @@ func contains(elements []string, value string) bool {
 	return false
 }
 
-func (p *connectorImp) buildAttributes(serviceName string, span ptrace.Span, resourceAttrs pcommon.Map) pcommon.Map {
+func (p *connectorImp) buildAttributes(serviceName string, span ptrace.Span, resourceAttrs pcommon.Map, dimensions []dimension) pcommon.Map {
 	attr := pcommon.NewMap()
-	attr.EnsureCapacity(4 + len(p.dimensions))
+	attr.EnsureCapacity(4 + len(dimensions))
 	if !contains(p.config.ExcludeDimensions, serviceNameKey) {
 		attr.PutStr(serviceNameKey, serviceName)
 	}
@@ -378,7 +409,7 @@ func (p *connectorImp) buildAttributes(serviceName string, span ptrace.Span, res
 	if !contains(p.config.ExcludeDimensions, statusCodeKey) {
 		attr.PutStr(statusCodeKey, traceutil.StatusCodeStr(span.Status().Code()))
 	}
-	for _, d := range p.dimensions {
+	for _, d := range dimensions {
 		if v, ok := getDimensionValue(d, span.Attributes(), resourceAttrs); ok {
 			v.CopyTo(attr.PutEmpty(d.name))
 		}
