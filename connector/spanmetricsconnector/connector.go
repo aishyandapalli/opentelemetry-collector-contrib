@@ -6,6 +6,7 @@ package spanmetricsconnector // import "github.com/open-telemetry/opentelemetry-
 import (
 	"bytes"
 	"context"
+	"github.com/open-telemetry/opentelemetry-collector-contrib/connector/spanmetricsconnector/internal/metrics"
 	"sync"
 	"time"
 
@@ -20,7 +21,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/connector/spanmetricsconnector/internal/cache"
-	"github.com/open-telemetry/opentelemetry-collector-contrib/connector/spanmetricsconnector/internal/metrics"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/internal/coreinternal/traceutil"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/pdatautil"
 )
@@ -320,6 +320,9 @@ func (p *connectorImp) aggregateMetrics(traces ptrace.Traces) {
 				}
 				// aggregate sums metrics
 				s := sums.GetOrCreate(key, attributes)
+				if p.config.Exemplars.Enabled && !span.TraceID().IsEmpty() {
+					s.AddExemplar(span.TraceID(), span.SpanID(), duration)
+				}
 				s.Add(1)
 			}
 		}
