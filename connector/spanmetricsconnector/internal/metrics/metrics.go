@@ -22,7 +22,7 @@ type HistogramMetrics interface {
 
 type Histogram interface {
 	Observe(value float64)
-	AddExemplar(traceID pcommon.TraceID, spanID pcommon.SpanID, value float64)
+	AddExemplar(traceID pcommon.TraceID, spanID pcommon.SpanID, value float64, maxCount int)
 }
 
 type explicitHistogramMetrics struct {
@@ -211,22 +211,40 @@ func (h *explicitHistogram) Observe(value float64) {
 	h.bucketCounts[index]++
 }
 
-func (h *explicitHistogram) AddExemplar(traceID pcommon.TraceID, spanID pcommon.SpanID, value float64) {
-	e := h.exemplars.AppendEmpty()
-	e.SetTraceID(traceID)
-	e.SetSpanID(spanID)
-	e.SetDoubleValue(value)
+func (h *explicitHistogram) AddExemplar(traceID pcommon.TraceID, spanID pcommon.SpanID, value float64, maxCount int) {
+	if maxCount > 0 {
+		if h.exemplars.Len() < maxCount {
+			e := h.exemplars.AppendEmpty()
+			e.SetTraceID(traceID)
+			e.SetSpanID(spanID)
+			e.SetDoubleValue(value)
+		}
+	} else {
+		e := h.exemplars.AppendEmpty()
+		e.SetTraceID(traceID)
+		e.SetSpanID(spanID)
+		e.SetDoubleValue(value)
+	}
 }
 
 func (h *exponentialHistogram) Observe(value float64) {
 	h.histogram.Update(value)
 }
 
-func (h *exponentialHistogram) AddExemplar(traceID pcommon.TraceID, spanID pcommon.SpanID, value float64) {
-	e := h.exemplars.AppendEmpty()
-	e.SetTraceID(traceID)
-	e.SetSpanID(spanID)
-	e.SetDoubleValue(value)
+func (h *exponentialHistogram) AddExemplar(traceID pcommon.TraceID, spanID pcommon.SpanID, value float64, maxCount int) {
+	if maxCount > 0 {
+		if h.exemplars.Len() < maxCount {
+			e := h.exemplars.AppendEmpty()
+			e.SetTraceID(traceID)
+			e.SetSpanID(spanID)
+			e.SetDoubleValue(value)
+		}
+	} else {
+		e := h.exemplars.AppendEmpty()
+		e.SetTraceID(traceID)
+		e.SetSpanID(spanID)
+		e.SetDoubleValue(value)
+	}
 }
 
 type Sum struct {
@@ -259,11 +277,20 @@ func (m *SumMetrics) GetOrCreate(key Key, attributes pcommon.Map) *Sum {
 	return s
 }
 
-func (s *Sum) AddExemplar(traceID pcommon.TraceID, spanID pcommon.SpanID, value float64) {
-	e := s.exemplars.AppendEmpty()
-	e.SetTraceID(traceID)
-	e.SetSpanID(spanID)
-	e.SetDoubleValue(value)
+func (s *Sum) AddExemplar(traceID pcommon.TraceID, spanID pcommon.SpanID, value float64, maxCount int) {
+	if maxCount > 0 {
+		if s.exemplars.Len() < maxCount {
+			e := s.exemplars.AppendEmpty()
+			e.SetTraceID(traceID)
+			e.SetSpanID(spanID)
+			e.SetDoubleValue(value)
+		}
+	} else {
+		e := s.exemplars.AppendEmpty()
+		e.SetTraceID(traceID)
+		e.SetSpanID(spanID)
+		e.SetDoubleValue(value)
+	}
 }
 
 func (m *SumMetrics) BuildMetrics(

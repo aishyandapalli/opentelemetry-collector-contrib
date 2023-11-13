@@ -71,7 +71,8 @@ type HistogramConfig struct {
 }
 
 type ExemplarsConfig struct {
-	Enabled bool `mapstructure:"enabled"`
+	Enabled             bool `mapstructure:"enabled"`
+	MaxNumPerDimensions int  `mapstructure:"max_num_per_dimensions"`
 }
 
 type ExponentialHistogramConfig struct {

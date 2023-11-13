@@ -338,7 +338,7 @@ func (p *connectorImp) aggregateMetrics(traces ptrace.Traces) {
 				// aggregate sums metrics
 				s := sums.GetOrCreate(key, attributes)
 				if p.config.Exemplars.Enabled && !span.TraceID().IsEmpty() {
-					s.AddExemplar(span.TraceID(), span.SpanID(), duration)
+					s.AddExemplar(span.TraceID(), span.SpanID(), duration, p.config.Exemplars.MaxNumPerDimensions)
 				}
 				s.Add(1)
 
@@ -380,7 +380,7 @@ func (p *connectorImp) addExemplar(span ptrace.Span, duration float64, h metrics
 		return
 	}
 
-	h.AddExemplar(span.TraceID(), span.SpanID(), duration)
+	h.AddExemplar(span.TraceID(), span.SpanID(), duration, p.config.Exemplars.MaxNumPerDimensions)
 }
 
 type resourceKey [16]byte
