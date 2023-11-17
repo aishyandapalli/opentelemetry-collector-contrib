@@ -144,7 +144,7 @@ func routingIdentifiersFromTraces(td ptrace.Traces, key routingKey) (map[string]
 		for i := 0; i < rs.Len(); i++ {
 			svc, ok := rs.At(i).Resource().Attributes().Get("service.name")
 			if !ok {
-				return nil, errors.New("unable to get service name")
+				continue
 			}
 			ids[svc.Str()] = true
 		}
