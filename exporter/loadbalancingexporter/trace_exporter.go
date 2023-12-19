@@ -146,7 +146,10 @@ func routingIdentifiersFromTraces(td ptrace.Traces, key routingKey) (map[string]
 			if !ok {
 				continue
 			}
-			ids[svc.Str()] = true
+			for j := 0; j < spans.Len(); j++ {
+				span := spans.At(i)
+				ids[fmt.Sprintf("%s|%s", svc.Str(), span.Name())] = true
+			}
 		}
 		return ids, nil
 	}
