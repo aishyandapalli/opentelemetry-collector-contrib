@@ -147,7 +147,7 @@ func routingIdentifiersFromTraces(td ptrace.Traces, key routingKey) (map[string]
 				return nil, errors.New("unable to get service name")
 			}
 			span := rs.At(i).ScopeSpans().At(0).Spans().At(0)
-			ids[fmt.Sprintf("%s|%s", svc.Str(), span.Name())] = true
+			ids[fmt.Sprintf("%s|%s", svc.Str(), span.TraceID().String())] = true
 		}
 		return ids, nil
 	}
