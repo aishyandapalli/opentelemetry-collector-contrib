@@ -159,7 +159,7 @@ func routingIdentifiersFromTraces(td ptrace.Traces, key routingKey) (map[string]
 		for i := 0; i < rs.Len(); i++ {
 			sspans := rs.At(i).ScopeSpans()
 			for j := 0; j < sspans.Len(); j++ {
-				ispans := sspans.At(i).Spans()
+				ispans := sspans.At(j).Spans()
 				for k := 0; k < ispans.Len(); k++ {
 					span := ispans.At(k)
 					rKey := computeResourceRoutingKey(span.Name(), rs.At(i).Resource().Attributes())
