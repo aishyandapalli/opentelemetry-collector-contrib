@@ -144,34 +144,30 @@ func routingIdentifiersFromTraces(td ptrace.Traces, key routingKey) (map[string]
 		return nil, errors.New("empty spans")
 	}
 
-	if key == svcRouting {
-		for i := 0; i < rs.Len(); i++ {
-			svc, ok := rs.At(i).Resource().Attributes().Get("service.name")
+	for i := 0; i < rs.Len(); i++ {
+		resource := rs.At(i).Resource()
+		switch key {
+		default:
+			tid := spans.At(0).TraceID()
+			ids[string(tid[:])] = true
+		case svcRouting:
+			svc, ok := resource.Attributes().Get("service.name")
 			if !ok {
-				continue
+				return nil, errors.New("unable to get service name")
 			}
 			ids[svc.Str()] = true
-		}
-		return ids, nil
-	}
-
-	if key == resourceRouting {
-		for i := 0; i < rs.Len(); i++ {
-			sspans := rs.At(i).ScopeSpans()
-			for j := 0; j < sspans.Len(); j++ {
-				ispans := sspans.At(j).Spans()
+		case resourceRouting:
+			ss := rs.At(i).ScopeSpans()
+			for j := 0; j < ss.Len(); j++ {
+				ispans := ss.At(j).Spans()
 				for k := 0; k < ispans.Len(); k++ {
 					span := ispans.At(k)
-					rKey := computeResourceRoutingKey(span.Name(), rs.At(i).Resource().Attributes())
+					rKey := computeResourceRoutingKey(span.Name(), resource.Attributes())
 					ids[rKey] = true
 				}
 			}
 		}
-		return ids, nil
 	}
-
-	tid := spans.At(0).TraceID()
-	ids[string(tid[:])] = true
 	return ids, nil
 }
 
