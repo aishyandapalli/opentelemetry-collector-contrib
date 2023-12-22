@@ -7,6 +7,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"go.opentelemetry.io/collector/pdata/pcommon"
+	"strings"
 	"sync"
 	"time"
 
@@ -144,13 +146,37 @@ func routingIdentifiersFromTraces(td ptrace.Traces, key routingKey) (map[string]
 		for i := 0; i < rs.Len(); i++ {
 			svc, ok := rs.At(i).Resource().Attributes().Get("service.name")
 			if !ok {
-				return nil, errors.New("unable to get service name")
+				continue
 			}
 			ids[svc.Str()] = true
 		}
 		return ids, nil
 	}
+
+	if key == resourceRouting {
+		for i := 0; i < rs.Len(); i++ {
+			sspans := rs.At(i).ScopeSpans()
+			for j := 0; j < sspans.Len(); j++ {
+				ispans := sspans.At(i).Spans()
+				for k := 0; k < ispans.Len(); k++ {
+					span := ispans.At(k)
+					rKey := computeResourceRoutingKey(span.Name(), rs.At(i).Resource().Attributes())
+					ids[rKey] = true
+				}
+			}
+		}
+		return ids, nil
+	}
+
 	tid := spans.At(0).TraceID()
 	ids[string(tid[:])] = true
 	return ids, nil
+}
+
+func computeResourceRoutingKey(name string, attrs pcommon.Map) string {
+	attrsHash := sortedMapAttrs(attrs)
+	attrsHash = append(attrsHash, name)
+	routingRef := strings.Join(attrsHash, "")
+
+	return routingRef
 }
