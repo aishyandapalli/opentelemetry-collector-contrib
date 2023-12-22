@@ -51,6 +51,8 @@ func newTracesExporter(params exporter.CreateSettings, cfg component.Config) (*t
 	switch cfg.(*Config).RoutingKey {
 	case "service":
 		traceExporter.routingKey = svcRouting
+	case "resource":
+		traceExporter.routingKey = resourceRouting
 	case "traceID", "":
 	default:
 		return nil, fmt.Errorf("unsupported routing_key: %s", cfg.(*Config).RoutingKey)
