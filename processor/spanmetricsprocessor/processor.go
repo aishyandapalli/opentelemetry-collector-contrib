@@ -34,8 +34,9 @@ const (
 	statusCodeKey      = "status.code" // OpenTelemetry non-standard constant.
 	metricKeySeparator = string(byte(0))
 
-	metricLatency    = "latency"
-	metricCallsTotal = "calls_total"
+	metricLatency     = "latency"
+	metricCallsTotal  = "calls_total"
+	metricEventsTotal = "events_total"
 
 	defaultDimensionsCacheSize = 1000
 )
@@ -81,6 +82,11 @@ type processorImp struct {
 	started bool
 
 	shutdownOnce sync.Once
+
+	// Event dimensions to add to the events metric.
+	eDimensions []dimension
+
+	events EventsConfig
 }
 
 type dimension struct {
@@ -149,6 +155,8 @@ func newProcessor(logger *zap.Logger, config component.Config, ticker *clock.Tic
 		metricKeyToDimensions: metricKeyToDimensionsCache,
 		ticker:                ticker,
 		done:                  make(chan struct{}),
+		eDimensions:           newDimensions(pConfig.Events.Dimensions),
+		events:                pConfig.Events,
 	}, nil
 }
 
@@ -282,6 +290,9 @@ func (p *processorImp) buildMetrics() pmetric.Metrics {
 	ilm.Scope().SetName("spanmetricsprocessor")
 
 	p.collectCallMetrics(ilm)
+	if p.events.Enabled && len(p.events.Dimensions) > 0 {
+		p.collectEventMetrics(ilm)
+	}
 	p.collectLatencyMetrics(ilm)
 
 	return m
@@ -326,6 +337,23 @@ func (p *processorImp) collectCallMetrics(ilm pmetric.ScopeMetrics) {
 		dpCalls.SetTimestamp(timestamp)
 		dpCalls.SetIntValue(int64(hist.count))
 		hist.attributes.CopyTo(dpCalls.Attributes())
+	}
+}
+
+func (p *processorImp) collectEventMetrics(ilm pmetric.ScopeMetrics) {
+	mEvents := ilm.Metrics().AppendEmpty()
+	mEvents.SetName(buildMetricName(p.config.Namespace, metricEventsTotal))
+	mEvents.SetEmptySum().SetIsMonotonic(true)
+	mEvents.Sum().SetAggregationTemporality(p.config.GetAggregationTemporality())
+	dps := mEvents.Sum().DataPoints()
+	dps.EnsureCapacity(len(p.histograms))
+	timestamp := pcommon.NewTimestampFromTime(time.Now())
+	for _, hist := range p.histograms {
+		dpEvents := dps.AppendEmpty()
+		dpEvents.SetStartTimestamp(p.startTimestamp)
+		dpEvents.SetTimestamp(timestamp)
+		dpEvents.SetIntValue(int64(hist.count))
+		hist.attributes.CopyTo(dpEvents.Attributes())
 	}
 }
 

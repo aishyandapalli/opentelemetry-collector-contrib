@@ -29,6 +29,13 @@ type Dimension struct {
 	Default *string `mapstructure:"default"`
 }
 
+type EventsConfig struct {
+	// Enabled is a flag to enable events.
+	Enabled bool `mapstructure:"enabled"`
+	// Dimensions defines the list of dimensions to add to the events metric.
+	Dimensions []Dimension `mapstructure:"dimensions"`
+}
+
 // Config defines the configuration options for spanmetricsprocessor.
 type Config struct {
 	// MetricsExporter is the name of the metrics exporter to use to ship metrics.
@@ -62,6 +69,9 @@ type Config struct {
 
 	// Namespace is the namespace to use for the metrics.
 	Namespace string `mapstructure:"namespace"`
+
+	// Events defines the configuration for events section of spans.
+	Events EventsConfig `mapstructure:"events"`
 }
 
 var _ component.ConfigValidator = (*Config)(nil)
