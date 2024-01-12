@@ -346,6 +346,7 @@ func (p *processorImp) collectCallMetrics(ilm pmetric.ScopeMetrics) {
 		dpCalls.SetStartTimestamp(p.startTimestamp)
 		dpCalls.SetTimestamp(timestamp)
 		dpCalls.SetIntValue(int64(hist.count))
+		setExemplars(hist.exemplars, timestamp, dpCalls.Exemplars())
 		hist.attributes.CopyTo(dpCalls.Attributes())
 	}
 }
@@ -364,6 +365,7 @@ func (p *processorImp) collectEventMetrics(ilm pmetric.ScopeMetrics) {
 		dpEvents.SetStartTimestamp(p.startTimestamp)
 		dpEvents.SetTimestamp(timestamp)
 		dpEvents.SetIntValue(int64(hist.count))
+		setExemplars(hist.exemplars, timestamp, dpEvents.Exemplars())
 		hist.attributes.CopyTo(dpEvents.Attributes())
 	}
 }
