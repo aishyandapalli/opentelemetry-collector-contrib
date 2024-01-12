@@ -153,6 +153,7 @@ func newProcessor(logger *zap.Logger, config component.Config, ticker *clock.Tic
 		startTimestamp:        pcommon.NewTimestampFromTime(time.Now()),
 		latencyBounds:         bounds,
 		histograms:            make(map[metricKey]*histogram),
+		eventsHistograms:      make(map[metricKey]*histogram),
 		dimensions:            newDimensions(pConfig.Dimensions),
 		keyBuf:                bytes.NewBuffer(make([]byte, 0, 1024)),
 		metricKeyToDimensions: metricKeyToDimensionsCache,
@@ -266,12 +267,18 @@ func (p *processorImp) exportMetrics(ctx context.Context) {
 	// If delta metrics, reset accumulated data
 	if p.config.GetAggregationTemporality() == pmetric.AggregationTemporalityDelta {
 		p.histograms = make(map[metricKey]*histogram)
+		p.eventsHistograms = make(map[metricKey]*histogram)
 		p.metricKeyToDimensions.Purge()
 	} else {
 		p.metricKeyToDimensions.RemoveEvictedItems()
 		for key := range p.histograms {
 			if !p.metricKeyToDimensions.Contains(key) {
 				delete(p.histograms, key)
+			}
+		}
+		for key := range p.eventsHistograms {
+			if !p.metricKeyToDimensions.Contains(key) {
+				delete(p.eventsHistograms, key)
 			}
 		}
 	}
@@ -464,6 +471,10 @@ func (p *processorImp) getOrCreateEventsHistogram(k metricKey, attr pcommon.Map)
 // and should be not considered like a metrics that persist over time.
 func (p *processorImp) resetExemplars() {
 	for _, histo := range p.histograms {
+		histo.exemplars = nil
+	}
+
+	for _, histo := range p.eventsHistograms {
 		histo.exemplars = nil
 	}
 }
