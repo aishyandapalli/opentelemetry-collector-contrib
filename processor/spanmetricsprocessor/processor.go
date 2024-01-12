@@ -71,6 +71,9 @@ type processorImp struct {
 	histograms    map[metricKey]*histogram
 	latencyBounds []float64
 
+	// Sum
+	eventsHistograms map[metricKey]*histogram
+
 	keyBuf *bytes.Buffer
 
 	// An LRU cache of dimension key-value maps keyed by a unique identifier formed by a concatenation of its values:
@@ -348,7 +351,7 @@ func (p *processorImp) collectEventMetrics(ilm pmetric.ScopeMetrics) {
 	dps := mEvents.Sum().DataPoints()
 	dps.EnsureCapacity(len(p.histograms))
 	timestamp := pcommon.NewTimestampFromTime(time.Now())
-	for _, hist := range p.histograms {
+	for _, hist := range p.eventsHistograms {
 		dpEvents := dps.AppendEmpty()
 		dpEvents.SetStartTimestamp(p.startTimestamp)
 		dpEvents.SetTimestamp(timestamp)
@@ -397,6 +400,31 @@ func (p *processorImp) aggregateMetrics(traces ptrace.Traces) {
 
 				h := p.getOrCreateHistogram(key, attributes)
 				h.observe(latencyMs, span.TraceID(), span.SpanID())
+
+				//events
+				if p.events.Enabled && len(p.events.Dimensions) > 0 {
+					for l := 0; l < span.Events().Len(); l++ {
+						event := span.Events().At(l)
+						eDimensions := p.dimensions
+						eDimensions = append(eDimensions, p.eDimensions...)
+
+						rscAndEventAttrs := pcommon.NewMap()
+						rscAndEventAttrs.EnsureCapacity(resourceAttr.Len() + event.Attributes().Len())
+						resourceAttr.CopyTo(rscAndEventAttrs)
+						event.Attributes().CopyTo(rscAndEventAttrs)
+
+						p.keyBuf.Reset()
+						buildKey(p.keyBuf, serviceName, span, eDimensions, rscAndEventAttrs)
+						eKey := metricKey(p.keyBuf.String())
+						eAttributes, ok := p.metricKeyToDimensions.Get(eKey)
+						if !ok {
+							eAttributes = p.buildAttributes(serviceName, span, rscAndEventAttrs)
+							p.metricKeyToDimensions.Add(eKey, eAttributes)
+						}
+						ehist := p.getOrCreateEventsHistogram(key, eAttributes)
+						ehist.observe(latencyMs, span.TraceID(), span.SpanID())
+					}
+				}
 			}
 		}
 	}
@@ -414,6 +442,20 @@ func (p *processorImp) getOrCreateHistogram(k metricKey, attr pcommon.Map) *hist
 		p.histograms[k] = h
 	}
 
+	return h
+}
+
+func (p *processorImp) getOrCreateEventsHistogram(k metricKey, attr pcommon.Map) *histogram {
+	h, ok := p.eventsHistograms[k]
+	if !ok {
+		h = &histogram{
+			attributes:    attr,
+			bucketCounts:  make([]uint64, len(p.latencyBounds)+1),
+			latencyBounds: p.latencyBounds,
+			exemplars:     []exemplar{},
+		}
+		p.eventsHistograms[k] = h
+	}
 	return h
 }
 
