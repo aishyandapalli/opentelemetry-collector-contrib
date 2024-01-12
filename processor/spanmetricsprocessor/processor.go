@@ -356,8 +356,9 @@ func (p *processorImp) collectEventMetrics(ilm pmetric.ScopeMetrics) {
 	mEvents.SetEmptySum().SetIsMonotonic(true)
 	mEvents.Sum().SetAggregationTemporality(p.config.GetAggregationTemporality())
 	dps := mEvents.Sum().DataPoints()
-	dps.EnsureCapacity(len(p.histograms))
+	dps.EnsureCapacity(len(p.eventsHistograms))
 	timestamp := pcommon.NewTimestampFromTime(time.Now())
+	p.logger.Info(fmt.Sprintf("length of events histograms is %d\n", len(p.eventsHistograms)))
 	for _, hist := range p.eventsHistograms {
 		dpEvents := dps.AppendEmpty()
 		dpEvents.SetStartTimestamp(p.startTimestamp)
