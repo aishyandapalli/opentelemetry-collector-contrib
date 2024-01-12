@@ -426,7 +426,7 @@ func (p *processorImp) aggregateMetrics(traces ptrace.Traces) {
 						eKey := metricKey(p.keyBuf.String())
 						eAttributes, ok := p.metricKeyToDimensions.Get(eKey)
 						if !ok {
-							eAttributes = p.buildAttributes(serviceName, span, rscAndEventAttrs)
+							eAttributes = p.buildEventAttributes(serviceName, span, rscAndEventAttrs)
 							p.metricKeyToDimensions.Add(eKey, eAttributes)
 						}
 						ehist := p.getOrCreateEventsHistogram(key, eAttributes)
@@ -489,6 +489,26 @@ func (p *processorImp) buildAttributes(serviceName string, span ptrace.Span, res
 	attr.PutStr(statusCodeKey, traceutil.StatusCodeStr(span.Status().Code()))
 	for _, d := range p.dimensions {
 		if v, ok := getDimensionValue(d, span.Attributes(), resourceAttrs); ok {
+			v.CopyTo(attr.PutEmpty(d.name))
+		}
+	}
+	return attr
+}
+
+func (p *processorImp) buildEventAttributes(serviceName string, span ptrace.Span, rscAndEventAttrs pcommon.Map) pcommon.Map {
+	attr := pcommon.NewMap()
+	attr.EnsureCapacity(4 + len(p.dimensions))
+	attr.PutStr(serviceNameKey, serviceName)
+	attr.PutStr(operationKey, span.Name())
+	attr.PutStr(spanKindKey, traceutil.SpanKindStr(span.Kind()))
+	attr.PutStr(statusCodeKey, traceutil.StatusCodeStr(span.Status().Code()))
+	for _, d := range p.dimensions {
+		if v, ok := getDimensionValue(d, span.Attributes(), rscAndEventAttrs); ok {
+			v.CopyTo(attr.PutEmpty(d.name))
+		}
+	}
+	for _, d := range p.eDimensions {
+		if v, ok := getDimensionValue(d, span.Attributes(), rscAndEventAttrs); ok {
 			v.CopyTo(attr.PutEmpty(d.name))
 		}
 	}
