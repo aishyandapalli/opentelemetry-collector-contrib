@@ -51,6 +51,8 @@ type Config struct {
 	// Optional. See defaultResourceMetricsCacheSize in connector.go for the default value.
 	ResourceMetricsCacheSize int `mapstructure:"resource_metrics_cache_size"`
 
+	ResourceMetricsKeyAttributes []string `mapstructure:"resource_metrics_key_attributes"`
+
 	AggregationTemporality string `mapstructure:"aggregation_temporality"`
 
 	Histogram HistogramConfig `mapstructure:"histogram"`
